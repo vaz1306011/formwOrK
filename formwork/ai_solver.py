@@ -1,52 +1,65 @@
 from __future__ import annotations
 
+import logging
 import time
 
 from google import genai
 from google.genai.errors import APIError
-from form_parser import Question
 
-MODELS = ["gemini-2.5-flash", "gemini-2.0-flash"]
+from .form_parser import Question
+
+logger = logging.getLogger(__name__)
+
+MODELS_DEFAULT = ["gemini-2.5-flash", "gemini-2.0-flash"]
+MODELS_PRO = ["gemini-3.1-pro-preview", "gemini-2.5-flash"]
 
 
-def solve_questions(questions: list[Question], gemini_key: str) -> list[str]:
+def solve_questions(
+    questions: list[Question], gemini_key: str, *, pro: bool = False
+) -> list[str]:
     client = genai.Client(api_key=gemini_key)
+    models = MODELS_PRO if pro else MODELS_DEFAULT
+    logger.info("使用模型: %s", models[0])
     answers: list[str] = []
 
     for q in questions:
-        answer = _solve(client, q)
+        answer = _solve(client, q, models)
         answers.append(answer)
-        print(f"題目 {q.index + 1}: {q.text[:40]}... → {answer[:60]}")
+        logger.info(f"題目 {q.index + 1}: {q.text[:40]}... → {answer[:60]}")
 
     return answers
 
 
-def _solve(client: genai.Client, q: Question) -> str:
+def _solve(client: genai.Client, q: Question, models: list[str]) -> str:
     parts: list[dict] = [{"text": _build_prompt(q)}]
     if q.image_base64:
-        parts.append({
-            "inline_data": {
-                "mime_type": "image/png",
-                "data": q.image_base64,
+        parts.append(
+            {
+                "inline_data": {
+                    "mime_type": "image/png",
+                    "data": q.image_base64,
+                }
             }
-        })
+        )
     contents = [{"parts": parts}]
 
-    for model in MODELS:
+    for model in models:
         for attempt in range(3):
             try:
-                response = client.models.generate_content(model=model, contents=contents)
+                response = client.models.generate_content(
+                    model=model, contents=contents
+                )
                 return response.text.strip()
             except APIError as e:
                 if e.code == 429:
                     wait = 35 * (attempt + 1)
-                    print(f"  {model} 速率限制，等待 {wait} 秒後重試...")
+                    logger.warning("%s 速率限制，等待 %d 秒後重試...", model, wait)
                     time.sleep(wait)
                 else:
-                    print(f"  {model} 失敗: {e}")
+                    logger.error("%s 失敗: %s", model, e)
                     break
             except Exception as e:
-                print(f"  {model} 失敗: {e}")
+                logger.error("%s 失敗: %s", model, e)
                 break
     return "（無法作答）"
 

@@ -1,15 +1,21 @@
 from __future__ import annotations
 
 import base64
+import logging
 from dataclasses import dataclass, field
+
 from playwright.async_api import Page
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
 class Question:
     index: int
     text: str
-    question_type: str  # "radio" | "checkbox" | "dropdown" | "short_answer" | "paragraph"
+    question_type: (
+        str  # "radio" | "checkbox" | "dropdown" | "short_answer" | "paragraph"
+    )
     options: list[str] = field(default_factory=list)
     image_base64: str | None = None
 
@@ -37,7 +43,7 @@ async def parse_form(page: Page, url: str) -> list[Question]:
         radios = await block.query_selector_all('[role="radio"]')
         checkboxes = await block.query_selector_all('[role="checkbox"]')
         dropdown = await block.query_selector('[role="listbox"]')
-        textarea = await block.query_selector('textarea')
+        textarea = await block.query_selector("textarea")
         short_input = await block.query_selector('input[type="text"]')
 
         if radios:
@@ -71,13 +77,15 @@ async def parse_form(page: Page, url: str) -> list[Question]:
         else:
             continue
 
-        questions.append(Question(
-            index=i,
-            text=text,
-            question_type=q_type,
-            options=options,
-            image_base64=image_base64,
-        ))
+        questions.append(
+            Question(
+                index=i,
+                text=text,
+                question_type=q_type,
+                options=options,
+                image_base64=image_base64,
+            )
+        )
 
-    print(f"解析到 {len(questions)} 道題目")
+    logger.info("解析到 %d 道題目", len(questions))
     return questions

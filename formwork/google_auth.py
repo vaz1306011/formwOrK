@@ -1,9 +1,12 @@
+import logging
 import os
 from pathlib import Path
 
 from playwright.async_api import async_playwright
 
-STATE_DIR = Path(__file__).parent / "auth_state"
+logger = logging.getLogger(__name__)
+
+STATE_DIR = Path(__file__).parent.parent / "auth_state"
 STATE_FILE = STATE_DIR / "google_state.json"
 
 
@@ -22,10 +25,10 @@ async def login_google(email: str, password: str) -> tuple:
         await page.wait_for_load_state("networkidle")
 
         if "signin" not in page.url:
-            print("使用已儲存的登入狀態")
+            logger.info("使用已儲存的登入狀態")
             return p, browser, context
 
-        print("登入狀態已過期，重新登入...")
+        logger.info("登入狀態已過期，重新登入...")
         await context.close()
 
     context = await browser.new_context(
@@ -46,10 +49,10 @@ async def login_google(email: str, password: str) -> tuple:
     await page.click("#passwordNext")
 
     await page.wait_for_url("**/myaccount.google.com/**", timeout=30000)
-    print("Google 登入成功")
+    logger.info("Google 登入成功")
 
     STATE_DIR.mkdir(exist_ok=True)
     await context.storage_state(path=str(STATE_FILE))
-    print("登入狀態已儲存")
+    logger.info("登入狀態已儲存")
 
     return p, browser, context

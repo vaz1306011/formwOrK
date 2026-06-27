@@ -1,7 +1,12 @@
 from __future__ import annotations
 
+import logging
+
 from playwright.async_api import Page
-from form_parser import Question
+
+from .form_parser import Question
+
+logger = logging.getLogger(__name__)
 
 
 async def fill_form(page: Page, questions: list[Question], answers: list[str]):
@@ -28,12 +33,13 @@ async def fill_form(page: Page, questions: list[Question], answers: list[str]):
         elif q.question_type in ("short_answer", "paragraph"):
             await _fill_text(block, q.question_type, answer)
 
-    print("所有題目已填寫完成，未送出（依設定跳過送出）")
+    logger.info("所有題目已填寫完成")
 
 
 def _normalize(text: str) -> str:
     import re
-    return re.sub(r'^[A-Za-z0-9]\s*[\.\)．）:：]\s*', '', text).strip().lower()
+
+    return re.sub(r"^[A-Za-z0-9]\s*[\.\)．）:：]\s*", "", text).strip().lower()
 
 
 async def _fill_radio(block, answer: str):
@@ -44,7 +50,11 @@ async def _fill_radio(block, answer: str):
         if not label:
             continue
         norm_label = _normalize(label)
-        if norm_label == norm_answer or norm_label in norm_answer or norm_answer in norm_label:
+        if (
+            norm_label == norm_answer
+            or norm_label in norm_answer
+            or norm_answer in norm_label
+        ):
             await r.click()
             return
 
