@@ -22,14 +22,23 @@ def solve_questions(
     logger.info("使用模型: %s", models[0])
     answers: list[str] = []
 
-    for q in questions:
-        if q.auto_answer:
-            answers.append(q.auto_answer)
-            logger.info("題目 %d: %s... → %s (自動填入)", q.index + 1, q.text[:40], q.auto_answer)
-            continue
-        answer = _solve(client, q, models)
-        answers.append(answer)
-        logger.info("題目 %d: %s... → %s", q.index + 1, q.text[:40], answer[:60])
+    try:
+        for q in questions:
+            if q.auto_answer:
+                answers.append(q.auto_answer)
+                logger.info(
+                    "題目 %d: %s... → %s (自動填入)",
+                    q.index + 1,
+                    q.text[:40],
+                    q.auto_answer,
+                )
+                continue
+            answer = _solve(client, q, models)
+            answers.append(answer)
+            logger.info("題目 %d: %s... → %s", q.index + 1, q.text[:40], answer[:60])
+    except KeyboardInterrupt:
+        logger.warning("使用者中斷，停止作答")
+        raise
 
     return answers
 
@@ -79,8 +88,10 @@ def _build_prompt(q: Question) -> str:
         return (
             f"{context_str}"
             f"これは{kind}問題です。\n"
-            f"選択肢の内容は本文または画像に含まれることがありますが、解答は必ず下の「選択可能なラベル」一覧の中から選び、"
-            f"そのラベルだけをそのまま出力してください（例:「ウ」や「C」）。選択肢の内容文や説明は一切出力しないでください。\n"
+            f"解答は必ず下の「選択可能なラベル」一覧の中から一つそのまま選び出力してください。\n"
+            f"一覧内の項目が「ア」「A」のような記号で始まる場合はその記号だけを出力してください。"
+            f"記号が付いていない場合は、その項目のテキストを一言一句そのまま出力してください（絶対に自分で記号を作らないこと）。\n"
+            f"説明・理由・言い換えは一切出力せず、選んだラベルまたはテキストのみを出力してください。\n"
             f"複数選択の場合はラベルをカンマで区切ってください。\n\n"
             f"問題：{q.text}\n"
             f"選択可能なラベル（この中から選ぶこと）：\n{options_str}\n\n"

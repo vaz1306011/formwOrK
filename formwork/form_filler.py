@@ -9,7 +9,6 @@ from .form_parser import Question
 logger = logging.getLogger(__name__)
 
 
-
 async def fill_form(page: Page, questions: list[Question], answers: list[str]):
     question_blocks = await page.query_selector_all('[role="listitem"]')
     q_map = {q.index: (q, a) for q, a in zip(questions, answers)}
@@ -19,6 +18,8 @@ async def fill_form(page: Page, questions: list[Question], answers: list[str]):
             continue
 
         q, answer = q_map[i]
+
+        logger.info("開始填寫題目 %d: %s", q.index + 1, answer[:60])
 
         filled = False
         if q.question_type == "radio":
