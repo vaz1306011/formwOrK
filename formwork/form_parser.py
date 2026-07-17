@@ -18,14 +18,19 @@ class Question:
     )
     options: list[str] = field(default_factory=list)
     image_base64: str | None = None
+    auto_answer: str | None = None
+    context: str | None = None
 
 
-async def parse_form(page: Page, url: str) -> list[Question]:
-    await page.goto(url, wait_until="networkidle")
+async def parse_form(page: Page, url: str | None) -> list[Question]:
+    if url:
+        await page.goto(url, wait_until="networkidle")
     await page.wait_for_selector('[role="listitem"]', timeout=15000)
 
     question_blocks = await page.query_selector_all('[role="listitem"]')
     questions: list[Question] = []
+    current_context: str | None = None
+    current_context_image: str | None = None
 
     for i, block in enumerate(question_blocks):
         heading = await block.query_selector('[role="heading"]')
@@ -75,7 +80,12 @@ async def parse_form(page: Page, url: str) -> list[Question]:
             q_type = "short_answer"
             options = []
         else:
+            current_context = text
+            current_context_image = image_base64
             continue
+
+        if not image_base64 and current_context_image:
+            image_base64 = current_context_image
 
         questions.append(
             Question(
@@ -84,6 +94,7 @@ async def parse_form(page: Page, url: str) -> list[Question]:
                 question_type=q_type,
                 options=options,
                 image_base64=image_base64,
+                context=current_context,
             )
         )
 
