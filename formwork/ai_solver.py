@@ -23,9 +23,13 @@ def solve_questions(
     answers: list[str] = []
 
     for q in questions:
+        if q.auto_answer:
+            answers.append(q.auto_answer)
+            logger.info("題目 %d: %s... → %s (自動填入)", q.index + 1, q.text[:40], q.auto_answer)
+            continue
         answer = _solve(client, q, models)
         answers.append(answer)
-        logger.info(f"題目 {q.index + 1}: {q.text[:40]}... → {answer[:60]}")
+        logger.info("題目 %d: %s... → %s", q.index + 1, q.text[:40], answer[:60])
 
     return answers
 
@@ -58,6 +62,8 @@ def _solve(client: genai.Client, q: Question, models: list[str]) -> str:
                 else:
                     logger.error("%s 失敗: %s", model, e)
                     break
+            except KeyboardInterrupt:
+                raise
             except Exception as e:
                 logger.error("%s 失敗: %s", model, e)
                 break
@@ -65,10 +71,13 @@ def _solve(client: genai.Client, q: Question, models: list[str]) -> str:
 
 
 def _build_prompt(q: Question) -> str:
+    context_str = f"背景情報：{q.context}\n\n" if q.context else ""
+
     if q.question_type in ("radio", "checkbox", "dropdown"):
         options_str = "\n".join(f"  {opt}" for opt in q.options)
         kind = "複数選択" if q.question_type == "checkbox" else "単一選択"
         return (
+            f"{context_str}"
             f"これは{kind}問題です。\n"
             f"選択肢の内容は本文または画像に含まれることがありますが、解答は必ず下の「選択可能なラベル」一覧の中から選び、"
             f"そのラベルだけをそのまま出力してください（例:「ウ」や「C」）。選択肢の内容文や説明は一切出力しないでください。\n"
@@ -79,6 +88,7 @@ def _build_prompt(q: Question) -> str:
         )
     else:
         return (
+            f"{context_str}"
             f"これは記述問題です。簡潔に解答だけを出力し、余計な説明は加えないでください。\n\n"
             f"問題：{q.text}\n\n"
             f"解答："
