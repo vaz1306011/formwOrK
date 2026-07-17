@@ -16,8 +16,13 @@ from formwork.form_filler import fill_form
 from formwork.form_parser import parse_form
 from formwork.google_auth import login_google
 
-NAME_PATTERN = re.compile(r"^(名前|氏名|姓名|なまえ|your name|name)\s*[：:。*\n]*$", re.IGNORECASE)
-NUMBER_PATTERN = re.compile(r"^(出席番号|出席番號|学籍番号|學號|番号|番號|student\s*(number|id))\s*[：:。*\n]*$", re.IGNORECASE)
+NAME_PATTERN = re.compile(
+    r"^(名前|氏名|姓名|なまえ|your name|name)\s*[：:。*\n]*$", re.IGNORECASE
+)
+NUMBER_PATTERN = re.compile(
+    r"^(出席番号|出席番號|学籍番号|學號|番号|番號|student\s*(number|id))\s*[：:。*\n]*$",
+    re.IGNORECASE,
+)
 
 
 async def run(
@@ -60,7 +65,9 @@ async def run(
                 for btn in all_btns:
                     text = (await btn.inner_text()).strip()
                     if text in ("次へ", "Next", "下一頁", "下一步", "繼續"):
-                        parent = await btn.evaluate_handle("el => el.closest('[role=\"button\"]')")
+                        parent = await btn.evaluate_handle(
+                            "el => el.closest('[role=\"button\"]')"
+                        )
                         await parent.click()
                         page_num += 1
                         logger.info("前往第 %d 頁", page_num)
@@ -107,7 +114,21 @@ def main():
         logger.error("請在 .env 中設定 GEMINI_API_KEY")
         sys.exit(1)
 
-    asyncio.run(run(args.url, email, password, gemini_key, pro=args.pro, student_name=student_name, student_number=student_number))
+    try:
+        asyncio.run(
+            run(
+                args.url,
+                email,
+                password,
+                gemini_key,
+                pro=args.pro,
+                student_name=student_name,
+                student_number=student_number,
+            )
+        )
+    except KeyboardInterrupt:
+        logger.warning("已中斷，結束程式")
+        sys.exit(130)
 
 
 if __name__ == "__main__":
