@@ -56,19 +56,52 @@ def _normalize(text: str) -> str:
     return re.sub(r"^[A-Za-z0-9]\s*[\.\)．）:：]\s*", "", text).strip().lower()
 
 
+def _split_prefix(text: str) -> tuple[str | None, str]:
+    """把「A. 第一セクター」拆成 ("a", "第一セクター")，沒有記號前綴則回傳 (None, 原文)"""
+    import re
+
+    m = re.match(r"^([A-Za-z0-9])\s*[\.\)．）:：]\s*(.*)$", text.strip())
+    if m:
+        return m.group(1).lower(), m.group(2).strip().lower()
+    return None, text.strip().lower()
+
+
+def _matches(label: str, answer: str) -> bool:
+    norm_answer = _normalize(answer)
+    raw_answer = answer.strip().lower()
+    prefix, rest = _split_prefix(label)
+    answer_prefix, _ = _split_prefix(answer)
+    full_norm_label = _normalize(label)
+
+    # AI 只回答記號本身（例如「A」或「A.」），對應選項前綴
+    if prefix and (
+        raw_answer == prefix
+        or norm_answer == prefix
+        or (answer_prefix is not None and answer_prefix == prefix)
+    ):
+        return True
+
+    if full_norm_label == norm_answer or full_norm_label == raw_answer:
+        return True
+
+    # 避免單一字元的子字串誤判，只在答案有一定長度時做包含比對
+    if len(norm_answer) > 1 and (
+        full_norm_label in norm_answer or norm_answer in full_norm_label
+    ):
+        return True
+    if rest and len(norm_answer) > 1 and (rest in norm_answer or norm_answer in rest):
+        return True
+
+    return False
+
+
 async def _fill_radio(block, answer: str) -> bool:
     radios = await block.query_selector_all('[role="radio"]')
-    norm_answer = _normalize(answer)
     for r in radios:
         label = await r.get_attribute("aria-label")
         if not label:
             continue
-        norm_label = _normalize(label)
-        if (
-            norm_label == norm_answer
-            or norm_label in norm_answer
-            or norm_answer in norm_label
-        ):
+        if _matches(label, answer):
             if await r.get_attribute("aria-checked") == "true":
                 return True
             await r.click()
@@ -91,15 +124,14 @@ async def _fill_grid_checkbox(block, row_index: int, answer: str) -> bool:
 
 
 async def _fill_checkbox(block, answer: str) -> bool:
-    selected = [_normalize(a) for a in answer.split(",")]
+    selected = [a.strip() for a in answer.split(",") if a.strip()]
     checkboxes = await block.query_selector_all('[role="checkbox"]')
     filled = False
     for cb in checkboxes:
         label = await cb.get_attribute("aria-label")
         if not label:
             continue
-        norm_label = _normalize(label)
-        if any(norm_label == s or norm_label in s or s in norm_label for s in selected):
+        if any(_matches(label, s) for s in selected):
             if await cb.get_attribute("aria-checked") != "true":
                 await cb.click()
             filled = True
@@ -114,7 +146,7 @@ async def _fill_dropdown(block, answer: str) -> bool:
         options = await block.page.query_selector_all('[role="option"]')
         for opt in options:
             text = (await opt.inner_text()).strip()
-            if answer.strip().lower() in text.lower():
+            if _matches(text, answer):
                 await opt.click()
                 return True
     return False
