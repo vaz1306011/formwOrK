@@ -35,7 +35,9 @@ def solve_questions(
                 continue
             answer = _solve(client, q, models)
             answers.append(answer)
-            logger.info("題目 %d: %s... → %s", q.index + 1, q.text[:40], answer[:60])
+            logger.info(
+                "題目 %d: %s... → %s\n----------", q.index + 1, q.text[:40], answer[:60]
+            )
     except KeyboardInterrupt:
         logger.warning("使用者中斷，停止作答")
         raise
