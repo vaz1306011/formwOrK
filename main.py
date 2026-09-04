@@ -17,10 +17,10 @@ from formwork.form_parser import parse_form
 from formwork.google_auth import login_google
 
 NAME_PATTERN = re.compile(
-    r"^(名前|氏名|姓名|なまえ|your name|name)\s*[：:。*\n]*$", re.IGNORECASE
+    r"(名前|氏名|姓名|なまえ|your\s*name|name)", re.IGNORECASE
 )
 NUMBER_PATTERN = re.compile(
-    r"^(出席番号|出席番號|学籍番号|學號|番号|番號|student\s*(number|id))\s*[：:。*\n]*$",
+    r"(出席番号|出席番號|学籍番号|學號|番号|番號|student\s*(number|id))",
     re.IGNORECASE,
 )
 
@@ -51,11 +51,14 @@ async def run(
                 break
 
             for q in questions:
-                text = q.text.strip()
-                if student_name and NAME_PATTERN.match(text):
-                    q.auto_answer = student_name
-                elif student_number and NUMBER_PATTERN.match(text):
+                text = q.text.replace("\n", " ").strip()
+                if student_number and NUMBER_PATTERN.search(text):
+                    # 先比對學號關鍵字，避免「出席番号」被誤判成姓名相關題目
                     q.auto_answer = student_number
+                    logger.info("自動填入學號：%s = %s", text, student_number)
+                elif student_name and NAME_PATTERN.search(text):
+                    q.auto_answer = student_name
+                    logger.info("自動填入姓名：%s = %s", text, student_name)
 
             answers = solve_questions(questions, gemini_key, pro=pro)
             page_unfilled = await fill_form(page, questions, answers)
