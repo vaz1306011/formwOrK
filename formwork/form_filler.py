@@ -10,11 +10,15 @@ from .form_parser import Question
 logger = logging.getLogger(__name__)
 
 
-async def fill_form(page: Page, questions: list[Question], answers: list[str]):
+async def fill_form(
+    page: Page, questions: list[Question], answers: list[str]
+) -> list[tuple[int, str]]:
     question_blocks = await page.query_selector_all('[role="listitem"]')
     q_map: dict[int, list[tuple[Question, str]]] = defaultdict(list)
     for q, a in zip(questions, answers):
         q_map[q.index].append((q, a))
+
+    unfilled: list[tuple[int, str]] = []
 
     for i, block in enumerate(question_blocks):
         if i not in q_map:
@@ -41,8 +45,9 @@ async def fill_form(page: Page, questions: list[Question], answers: list[str]):
 
             if not filled:
                 logger.warning("題目 %d 無法填入答案: %s", q.index + 1, answer[:60])
+                unfilled.append((q.index + 1, q.text.strip()))
 
-    logger.info("所有題目已填寫完成")
+    return unfilled
 
 
 def _normalize(text: str) -> str:

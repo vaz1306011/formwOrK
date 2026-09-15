@@ -40,6 +40,8 @@ async def run(
     try:
         page = await context.new_page()
         page_num = 1
+        total_questions = 0
+        all_unfilled: list[tuple[int, str]] = []
 
         while True:
             questions = await parse_form(page, form_url if page_num == 1 else None)
@@ -56,7 +58,11 @@ async def run(
                     q.auto_answer = student_number
 
             answers = solve_questions(questions, gemini_key, pro=pro)
-            await fill_form(page, questions, answers)
+            page_unfilled = await fill_form(page, questions, answers)
+            all_unfilled.extend(
+                (total_questions + idx, text) for idx, text in page_unfilled
+            )
+            total_questions += len(questions)
 
             next_btn = await page.query_selector('div[role="button"] span')
             found_next = False
@@ -77,6 +83,13 @@ async def run(
 
             if not found_next:
                 break
+
+        filled_count = total_questions - len(all_unfilled)
+        logger.info("作答完成度：%d/%d", filled_count, total_questions)
+        if all_unfilled:
+            logger.warning("以下題目未成功填寫：")
+            for num, text in all_unfilled:
+                logger.warning("  題號 %d: %s", num, text)
 
         input("填寫完成，按 Enter 關閉瀏覽器...")
     finally:
