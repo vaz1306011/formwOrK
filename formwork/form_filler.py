@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from collections import defaultdict
 
 from playwright.async_api import Page
 
@@ -11,28 +12,35 @@ logger = logging.getLogger(__name__)
 
 async def fill_form(page: Page, questions: list[Question], answers: list[str]):
     question_blocks = await page.query_selector_all('[role="listitem"]')
-    q_map = {q.index: (q, a) for q, a in zip(questions, answers)}
+    q_map: dict[int, list[tuple[Question, str]]] = defaultdict(list)
+    for q, a in zip(questions, answers):
+        q_map[q.index].append((q, a))
 
     for i, block in enumerate(question_blocks):
         if i not in q_map:
             continue
 
-        q, answer = q_map[i]
+        for q, answer in q_map[i]:
+            logger.info("開始填寫題目 %d: %s", q.index + 1, answer[:60])
 
-        logger.info("開始填寫題目 %d: %s", q.index + 1, answer[:60])
+            filled = False
+            if q.question_type == "radio":
+                if q.grid_row is not None:
+                    filled = await _fill_grid_radio(block, q.grid_row, answer)
+                else:
+                    filled = await _fill_radio(block, answer)
+            elif q.question_type == "checkbox":
+                if q.grid_row is not None:
+                    filled = await _fill_grid_checkbox(block, q.grid_row, answer)
+                else:
+                    filled = await _fill_checkbox(block, answer)
+            elif q.question_type == "dropdown":
+                filled = await _fill_dropdown(block, answer)
+            elif q.question_type in ("short_answer", "paragraph"):
+                filled = await _fill_text(block, q.question_type, answer)
 
-        filled = False
-        if q.question_type == "radio":
-            filled = await _fill_radio(block, answer)
-        elif q.question_type == "checkbox":
-            filled = await _fill_checkbox(block, answer)
-        elif q.question_type == "dropdown":
-            filled = await _fill_dropdown(block, answer)
-        elif q.question_type in ("short_answer", "paragraph"):
-            filled = await _fill_text(block, q.question_type, answer)
-
-        if not filled:
-            logger.warning("題目 %d 無法填入答案: %s", q.index + 1, answer[:60])
+            if not filled:
+                logger.warning("題目 %d 無法填入答案: %s", q.index + 1, answer[:60])
 
     logger.info("所有題目已填寫完成")
 
@@ -61,6 +69,20 @@ async def _fill_radio(block, answer: str) -> bool:
             await r.click()
             return True
     return False
+
+
+async def _fill_grid_radio(block, row_index: int, answer: str) -> bool:
+    radiogroups = await block.query_selector_all('[role="radiogroup"]')
+    if row_index >= len(radiogroups):
+        return False
+    return await _fill_radio(radiogroups[row_index], answer)
+
+
+async def _fill_grid_checkbox(block, row_index: int, answer: str) -> bool:
+    groups = await block.query_selector_all('[role="group"]')
+    if row_index >= len(groups):
+        return False
+    return await _fill_checkbox(groups[row_index], answer)
 
 
 async def _fill_checkbox(block, answer: str) -> bool:

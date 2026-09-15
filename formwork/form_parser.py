@@ -20,6 +20,7 @@ class Question:
     image_base64: str | None = None
     auto_answer: str | None = None
     context: str | None = None
+    grid_row: int | None = None  # row index within a grid (matrix) question
 
 
 async def parse_form(page: Page, url: str | None) -> list[Question]:
@@ -45,13 +46,65 @@ async def parse_form(page: Page, url: str | None) -> list[Question]:
             screenshot_bytes = await img.screenshot()
             image_base64 = base64.b64encode(screenshot_bytes).decode()
 
+        radiogroups = await block.query_selector_all('[role="radiogroup"]')
+        checkbox_groups = await block.query_selector_all('[role="group"]')
         radios = await block.query_selector_all('[role="radio"]')
         checkboxes = await block.query_selector_all('[role="checkbox"]')
         dropdown = await block.query_selector('[role="listbox"]')
         textarea = await block.query_selector("textarea")
         short_input = await block.query_selector('input[type="text"]')
 
-        if radios:
+        if len(radiogroups) > 1:
+            # multiple-choice grid: each radiogroup is one row
+            if not image_base64 and current_context_image:
+                image_base64 = current_context_image
+            for row_idx, rg in enumerate(radiogroups):
+                row_label = await rg.get_attribute("aria-label")
+                row_radios = await rg.query_selector_all('[role="radio"]')
+                row_options = []
+                for r in row_radios:
+                    label = await r.get_attribute("aria-label")
+                    if label:
+                        row_options.append(label)
+                questions.append(
+                    Question(
+                        index=i,
+                        text=f"{text}：{row_label or f'第{row_idx + 1}列'}",
+                        question_type="radio",
+                        options=row_options,
+                        image_base64=image_base64,
+                        context=current_context,
+                        grid_row=row_idx,
+                    )
+                )
+            continue
+        elif len(checkbox_groups) > 1 and any(
+            await g.query_selector('[role="checkbox"]') for g in checkbox_groups
+        ):
+            # checkbox grid: each group is one row
+            if not image_base64 and current_context_image:
+                image_base64 = current_context_image
+            for row_idx, g in enumerate(checkbox_groups):
+                row_label = await g.get_attribute("aria-label")
+                row_checkboxes = await g.query_selector_all('[role="checkbox"]')
+                row_options = []
+                for c in row_checkboxes:
+                    label = await c.get_attribute("aria-label")
+                    if label:
+                        row_options.append(label)
+                questions.append(
+                    Question(
+                        index=i,
+                        text=f"{text}：{row_label or f'第{row_idx + 1}列'}",
+                        question_type="checkbox",
+                        options=row_options,
+                        image_base64=image_base64,
+                        context=current_context,
+                        grid_row=row_idx,
+                    )
+                )
+            continue
+        elif radios:
             q_type = "radio"
             options = []
             for r in radios:
