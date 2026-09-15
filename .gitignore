@@ -14,3 +14,4 @@ wheels/
 
 # Saved auth state
 auth_state/
+.DS_Store
