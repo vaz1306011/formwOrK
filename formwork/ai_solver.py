@@ -10,8 +10,8 @@ from .form_parser import Question
 
 logger = logging.getLogger(__name__)
 
-MODELS_DEFAULT = ["gemini-2.5-flash", "gemini-2.0-flash"]
-MODELS_PRO = ["gemini-3.1-pro-preview", "gemini-2.5-flash"]
+MODELS_DEFAULT = ["gemini-3.1-flash-lite", "gemini-3.8-flash"]
+MODELS_PRO = ["gemini-3.1-pro-preview", "gemini-3.8-flash"]
 
 
 def solve_questions(
