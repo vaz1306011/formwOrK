@@ -131,9 +131,11 @@ async def _fill_checkbox(block, answer: str) -> bool:
         label = await cb.get_attribute("aria-label")
         if not label:
             continue
-        if any(_matches(label, s) for s in selected):
-            if await cb.get_attribute("aria-checked") != "true":
-                await cb.click()
+        should_check = any(_matches(label, s) for s in selected)
+        is_checked = await cb.get_attribute("aria-checked") == "true"
+        if should_check != is_checked:
+            await cb.click()
+        if should_check:
             filled = True
     return filled
 
