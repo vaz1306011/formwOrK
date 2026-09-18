@@ -23,6 +23,10 @@ NUMBER_PATTERN = re.compile(
     r"(出席番号|出席番號|学籍番号|學號|番号|番號|student\s*(number|id))",
     re.IGNORECASE,
 )
+# 姓名/學號欄位通常是短標籤（例如「7桁出席番号」），題目本身較長時
+# 即使含有相同關鍵字（例如「...の名前として適切なものを答えなさい」）
+# 也不應被誤判為姓名/學號欄位
+AUTO_ANSWER_MAX_LEN = 20
 
 
 async def run(
@@ -52,11 +56,12 @@ async def run(
 
             for q in questions:
                 text = q.text.replace("\n", " ").strip()
-                if student_number and NUMBER_PATTERN.search(text):
+                is_short_label = len(text) <= AUTO_ANSWER_MAX_LEN
+                if student_number and is_short_label and NUMBER_PATTERN.search(text):
                     # 先比對學號關鍵字，避免「出席番号」被誤判成姓名相關題目
                     q.auto_answer = student_number
                     logger.info("自動填入學號：%s = %s", text, student_number)
-                elif student_name and NAME_PATTERN.search(text):
+                elif student_name and is_short_label and NAME_PATTERN.search(text):
                     q.auto_answer = student_name
                     logger.info("自動填入姓名：%s = %s", text, student_name)
 
