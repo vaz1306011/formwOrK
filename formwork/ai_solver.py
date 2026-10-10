@@ -64,6 +64,9 @@ def _solve(client: genai.Client, q: Question, models: list[str]) -> str:
                 response = client.models.generate_content(
                     model=model, contents=contents
                 )
+                if response.text is None:
+                    logger.error("%s 回傳空白內容", model)
+                    break
                 return response.text.strip()
             except APIError as e:
                 if e.code == 429:
