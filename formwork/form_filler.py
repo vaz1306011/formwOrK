@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from collections import defaultdict
 
 from playwright.async_api import Page
@@ -50,19 +51,22 @@ async def fill_form(
     return unfilled
 
 
-def _normalize(text: str) -> str:
-    import re
+_PREFIX_RE = re.compile(
+    r"^(?:[(（]\s*([^\s()（）])\s*[)）]|([A-Za-z0-9ァ-ヶぁ-ん])\s*[\.\)．）:：])\s*(.*)$"
+)
 
-    return re.sub(r"^[A-Za-z0-9]\s*[\.\)．）:：]\s*", "", text).strip().lower()
+
+def _normalize(text: str) -> str:
+    m = _PREFIX_RE.match(text.strip())
+    rest = m.group(3).strip() if m else ""
+    return (rest or text).strip().lower()
 
 
 def _split_prefix(text: str) -> tuple[str | None, str]:
-    """把「A. 第一セクター」拆成 ("a", "第一セクター")，沒有記號前綴則回傳 (None, 原文)"""
-    import re
-
-    m = re.match(r"^([A-Za-z0-9])\s*[\.\)．）:：]\s*(.*)$", text.strip())
+    """把「A. 第一セクター」或「(ア)」拆成 ("a", "第一セクター") / ("ア", "")，沒有記號前綴則回傳 (None, 原文)"""
+    m = _PREFIX_RE.match(text.strip())
     if m:
-        return m.group(1).lower(), m.group(2).strip().lower()
+        return (m.group(1) or m.group(2)).lower(), m.group(3).strip().lower()
     return None, text.strip().lower()
 
 
